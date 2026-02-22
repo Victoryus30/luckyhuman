@@ -42,7 +42,10 @@ export default function Home() {
   }, [])
 
   useEffect(() => {
-    if (user?.nullifier_hash) verificarParticipacion(user.nullifier_hash)
+    if (user) {
+      const id = (user as any).nullifier_hash || (user as any).id || user.username
+      if (id) verificarParticipacion(id)
+    }
   }, [user])
 
   async function cargarParticipantes() {
@@ -66,15 +69,21 @@ export default function Home() {
   }
 
   async function participar() {
-    if (!user?.nullifier_hash) return
+    const id = (user as any)?.nullifier_hash || (user as any)?.id || user?.username
+    if (!id) {
+      alert("Error: no se pudo obtener tu ID. Datos: " + JSON.stringify(user))
+      return
+    }
     setCargando(true)
     const hoy = new Date().toISOString().split("T")[0]
     const { error } = await supabase.from("participantes").insert({
-      world_id: user.nullifier_hash,
-      username: user.username,
+      world_id: id,
+      username: user?.username,
       fecha_rifa: hoy,
     })
-    if (!error) {
+    if (error) {
+      alert("Error al participar: " + error.message)
+    } else {
       setYaParticipo(true)
       setParticipantes((p) => p + 1)
     }

@@ -11,8 +11,8 @@ async function verificarTransaccion(transactionId: string, appId: string, apiKey
       }
     )
     const data = await res.json()
+    console.log("Intento", i + 1, "- Respuesta World:", JSON.stringify(data))
     if (data.transactionStatus === "mined") return data
-    // Esperar 3 segundos antes del siguiente intento
     await new Promise((r) => setTimeout(r, 3000))
   }
   return null

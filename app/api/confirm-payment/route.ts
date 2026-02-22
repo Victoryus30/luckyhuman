@@ -1,6 +1,23 @@
 import { NextRequest, NextResponse } from "next/server"
 import { supabase } from "../../../lib/supabase"
 
+async function verificarTransaccion(transactionId: string, appId: string, apiKey: string, intentos = 5): Promise<any> {
+  for (let i = 0; i < intentos; i++) {
+    const res = await fetch(
+      `https://developer.worldcoin.org/api/v2/minikit/transaction/${transactionId}?app_id=${appId}`,
+      {
+        method: "GET",
+        headers: { Authorization: `Bearer ${apiKey}` },
+      }
+    )
+    const data = await res.json()
+    if (data.transactionStatus === "mined") return data
+    // Esperar 3 segundos antes del siguiente intento
+    await new Promise((r) => setTimeout(r, 3000))
+  }
+  return null
+}
+
 export async function POST(req: NextRequest) {
   const { payload, world_id, username } = await req.json()
 
@@ -8,7 +25,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Pago cancelado o fallido" }, { status: 400 })
   }
 
-  // 1. Verificar que el reference existe y está pendiente
   const { data: ref, error: refError } = await supabase
     .from("payment_references")
     .select("*")
@@ -20,30 +36,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Referencia de pago inválida" }, { status: 400 })
   }
 
-  // 2. Verificar el pago con World
-  const verifyRes = await fetch(
-    `https://developer.worldcoin.org/api/v2/minikit/transaction/${payload.transaction_id}?app_id=${process.env.APP_ID}`,
-    {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${process.env.DEV_PORTAL_API_KEY}`,
-      },
-    }
+  const transaction = await verificarTransaccion(
+    payload.transaction_id,
+    process.env.APP_ID as string,
+    process.env.DEV_PORTAL_API_KEY as string
   )
 
-  const transaction = await verifyRes.json()
-
-  if (transaction.transactionStatus !== "mined") {
-    return NextResponse.json({ error: "Transacción no confirmada aún" }, { status: 400 })
+  if (!transaction) {
+    return NextResponse.json({ error: "Transacción no confirmada después de varios intentos" }, { status: 400 })
   }
 
-  // 3. Marcar reference como usado
   await supabase
     .from("payment_references")
     .update({ status: "confirmed" })
     .eq("reference", payload.reference)
 
-  // 4. Registrar participante
   const hoy = new Date().toISOString().split("T")[0]
   const { error: insertError } = await supabase.from("participantes").insert({
     world_id,

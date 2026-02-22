@@ -1,6 +1,7 @@
 "use client"
 
 import { useWorldAuth } from "@radish-la/world-auth"
+import { MiniKit, tokenToDecimals, Tokens, PayCommandInput } from "@worldcoin/minikit-js"
 import { Button } from "@worldcoin/mini-apps-ui-kit-react"
 import { useEffect, useState } from "react"
 import { supabase } from "../lib/supabase"
@@ -69,24 +70,62 @@ export default function Home() {
   }
 
   async function participar() {
-    const id = (user as any)?.nullifier_hash || (user as any)?.id || user?.username
-    if (!id) {
-      alert("Error: no se pudo obtener tu ID. Datos: " + JSON.stringify(user))
+    if (!MiniKit.isInstalled()) {
+      alert("Abre esta app dentro de World App")
       return
     }
-    setCargando(true)
-    const hoy = new Date().toISOString().split("T")[0]
-    const { error } = await supabase.from("participantes").insert({
-      world_id: id,
-      username: user?.username,
-      fecha_rifa: hoy,
-    })
-    if (error) {
-      alert("Error al participar: " + error.message)
-    } else {
-      setYaParticipo(true)
-      setParticipantes((p) => p + 1)
+
+    const id = (user as any)?.nullifier_hash || (user as any)?.id || user?.username
+    if (!id) {
+      alert("Error: no se pudo obtener tu ID")
+      return
     }
+
+    setCargando(true)
+
+    try {
+      // 1. Obtener reference ID del servidor
+      const refRes = await fetch("/api/initiate-payment", { method: "POST" })
+      const { id: reference } = await refRes.json()
+
+      // 2. Lanzar el pago con MiniKit
+      const payload: PayCommandInput = {
+        reference,
+        to: process.env.NEXT_PUBLIC_WALLET_ADDRESS as string,
+        tokens: [
+          {
+            symbol: Tokens.WLD,
+            token_amount: tokenToDecimals(0.1, Tokens.WLD).toString(),
+          },
+        ],
+        description: "Entrada LuckyHuman - Rifa diaria",
+      }
+
+      const { finalPayload } = await MiniKit.commandsAsync.pay(payload)
+
+      // 3. Confirmar el pago en el servidor
+      const confirmRes = await fetch("/api/confirm-payment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          payload: finalPayload,
+          world_id: id,
+          username: user?.username,
+        }),
+      })
+
+      const result = await confirmRes.json()
+
+      if (result.success) {
+        setYaParticipo(true)
+        setParticipantes((p) => p + 1)
+      } else {
+        alert("Error al confirmar pago: " + result.error)
+      }
+    } catch (err) {
+      alert("Error inesperado: " + String(err))
+    }
+
     setCargando(false)
   }
 
@@ -123,7 +162,7 @@ export default function Home() {
               </div>
             ) : (
               <Button onClick={participar} fullWidth disabled={cargando}>
-                {cargando ? "Registrando..." : "Participar por $0.10 USD"}
+                {cargando ? "Procesando pago..." : "Participar — 0.10 WLD"}
               </Button>
             )}
           </div>

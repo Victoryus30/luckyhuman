@@ -32,6 +32,10 @@ export default function Home() {
       alert("LuckyHuman funciona dentro de World App")
     },
   })
+  
+  useEffect(() => {
+  if (user) console.log("USER DATA:", JSON.stringify(user))
+}, [user])
 
   const timeLeft = useCountdown()
   const [participantes, setParticipantes] = useState(0)

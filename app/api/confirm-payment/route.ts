@@ -1,19 +1,32 @@
 import { NextRequest, NextResponse } from "next/server"
+import { createPublicClient, http } from "viem"
 import { supabase } from "../../../lib/supabase"
 
+const worldchain = {
+  id: 480,
+  name: "World Chain",
+  nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+  rpcUrls: {
+    default: { http: ["https://worldchain-mainnet.g.alchemy.com/public"] },
+  },
+}
+
+const publicClient = createPublicClient({
+  chain: worldchain,
+  transport: http(),
+})
+
 export async function POST(req: NextRequest) {
-  const { payload, world_id, username, wallet_address } = await req.json()
+  const { payload, world_id, username } = await req.json()
 
   if (!payload || payload.status === "error") {
     return NextResponse.json({ error: "Pago cancelado o fallido" }, { status: 400 })
   }
 
-  // Verificar que el transaction_id existe (pago fue iniciado)
   if (!payload.transaction_id) {
     return NextResponse.json({ error: "Sin transaction_id" }, { status: 400 })
   }
 
-  // Verificar que el reference existe y está pendiente
   const { data: ref, error: refError } = await supabase
     .from("payment_references")
     .select("*")
@@ -25,13 +38,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Referencia inválida o ya usada" }, { status: 400 })
   }
 
-  // Marcar reference como confirmado
+  // Obtener wallet del participante desde el blockchain
+  let wallet_address = null
+  try {
+    const tx = await publicClient.getTransaction({
+      hash: payload.transaction_id as `0x${string}`,
+    })
+    wallet_address = tx.from
+  } catch (e) {
+    console.log("No se pudo obtener wallet desde blockchain:", e)
+  }
+
   await supabase
     .from("payment_references")
     .update({ status: "confirmed" })
     .eq("reference", payload.reference)
 
-  // Registrar participante
   const hoy = new Date().toISOString().split("T")[0]
   const { error: insertError } = await supabase.from("participantes").insert({
     world_id,

@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/sorteo?secret=luckyhuman_sorteo_2025_secreto",
+      "schedule": "0 6 * * *"
+    }
+  ]
+}

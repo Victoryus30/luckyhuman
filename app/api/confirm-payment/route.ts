@@ -2,10 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { supabase } from "../../../lib/supabase"
 
 export async function POST(req: NextRequest) {
-  const { payload, payload_debug, world_id, username } = await req.json()
-
-  // Log para ver qué contiene el payload
-  console.log("PAYLOAD COMPLETO:", payload_debug)
+  const { payload, world_id, username } = await req.json()
 
   if (!payload || payload.status === "error") {
     return NextResponse.json({ error: "Pago cancelado o fallido" }, { status: 400 })
@@ -37,7 +34,7 @@ export async function POST(req: NextRequest) {
     username,
     fecha_rifa: hoy,
     transaction_id: payload.transaction_id,
-    wallet_address: null,
+    wallet_address: payload.from,
   })
 
   if (insertError) {

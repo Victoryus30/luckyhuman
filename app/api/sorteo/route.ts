@@ -28,7 +28,6 @@ const WLD_ABI = [
 ] as const
 
 export async function GET(req: Request) {
-  // Verificar clave secreta para proteger el endpoint
   const { searchParams } = new URL(req.url)
   const secret = searchParams.get("secret")
   if (secret !== process.env.CRON_SECRET) {
@@ -37,7 +36,6 @@ export async function GET(req: Request) {
 
   const hoy = new Date().toISOString().split("T")[0]
 
-  // Verificar que no se haya hecho el sorteo hoy ya
   const { data: ganadorExistente } = await supabase
     .from("ganadores")
     .select("id")
@@ -48,7 +46,6 @@ export async function GET(req: Request) {
     return NextResponse.json({ message: "Sorteo ya realizado hoy" })
   }
 
-  // Obtener participantes de hoy
   const { data: participantes, error } = await supabase
     .from("participantes")
     .select("*")
@@ -62,7 +59,11 @@ export async function GET(req: Request) {
   const indice = Math.floor(Math.random() * participantes.length)
   const ganador = participantes[indice]
 
-  // Calcular pool (92% del total, 8% comisión)
+  if (!ganador.wallet_address) {
+    return NextResponse.json({ error: "El ganador no tiene wallet registrada" }, { status: 500 })
+  }
+
+  // Calcular pool (92% del total)
   const poolGanador = participantes.length * 0.1 * 0.92
 
   // Transferir WLD al ganador
@@ -79,20 +80,17 @@ export async function GET(req: Request) {
     transport: http(),
   })
 
-  // Convertir WLD a wei (18 decimales)
   const amount = parseEther(poolGanador.toFixed(18))
 
   const hash = await walletClient.writeContract({
-    address: WLD_CONTRACT,
+    address: WLD_CONTRACT as `0x${string}`,
     abi: WLD_ABI,
     functionName: "transfer",
-    args: [ganador.world_id as `0x${string}`, amount],
+    args: [ganador.wallet_address as `0x${string}`, amount],
   })
 
-  // Esperar confirmación
   await publicClient.waitForTransactionReceipt({ hash })
 
-  // Guardar ganador en base de datos
   await supabase.from("ganadores").insert({
     fecha_rifa: hoy,
     world_id: ganador.world_id,

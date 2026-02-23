@@ -1,20 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createPublicClient, http } from "viem"
 import { supabase } from "../../../lib/supabase"
-
-const worldchain = {
-  id: 480,
-  name: "World Chain",
-  nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
-  rpcUrls: {
-    default: { http: ["https://worldchain-mainnet.g.alchemy.com/public"] },
-  },
-}
-
-const publicClient = createPublicClient({
-  chain: worldchain,
-  transport: http(),
-})
 
 export async function POST(req: NextRequest) {
   const { payload, world_id, username } = await req.json()
@@ -38,15 +23,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Referencia inválida o ya usada" }, { status: 400 })
   }
 
-  // Obtener wallet del participante desde el blockchain
+  // Obtener wallet desde la API de World
   let wallet_address = null
   try {
-    const tx = await publicClient.getTransaction({
-      hash: payload.transaction_id as `0x${string}`,
-    })
-    wallet_address = tx.from
+    const res = await fetch(
+      `https://developer.worldcoin.org/api/v2/minikit/transaction/${payload.transaction_id}?app_id=${process.env.APP_ID}`,
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.DEV_PORTAL_API_KEY}`,
+        },
+      }
+    )
+    const txData = await res.json()
+    console.log("TX DATA:", JSON.stringify(txData))
+    wallet_address = txData.fromWalletAddress || txData.from || txData.wallet_address || null
   } catch (e) {
-    console.log("No se pudo obtener wallet desde blockchain:", e)
+    console.log("Error obteniendo wallet:", e)
   }
 
   await supabase

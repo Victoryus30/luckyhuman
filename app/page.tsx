@@ -32,7 +32,7 @@ export default function Home() {
       alert("LuckyHuman funciona dentro de World App")
     },
   })
-  
+
   useEffect(() => {
   if (user) console.log("USER DATA:", JSON.stringify(user))
 }, [user])
@@ -111,10 +111,11 @@ export default function Home() {
       const confirmRes = await fetch("/api/confirm-payment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+       body: JSON.stringify({
           payload: finalPayload,
           world_id: id,
           username: user?.username,
+          wallet_address: (MiniKit as any).walletAddress,
         }),
       })
 

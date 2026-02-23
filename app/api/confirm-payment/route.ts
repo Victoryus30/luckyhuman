@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { supabase } from "../../../lib/supabase"
 
 export async function POST(req: NextRequest) {
-  const { payload, world_id, username } = await req.json()
+  const { payload, world_id, username, wallet_address } = await req.json()
 
   if (!payload || payload.status === "error") {
     return NextResponse.json({ error: "Pago cancelado o fallido" }, { status: 400 })
@@ -38,6 +38,7 @@ export async function POST(req: NextRequest) {
     username,
     fecha_rifa: hoy,
     transaction_id: payload.transaction_id,
+    wallet_address,
   })
 
   if (insertError) {

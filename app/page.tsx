@@ -33,10 +33,6 @@ export default function Home() {
     },
   })
 
-  useEffect(() => {
-  if (user) console.log("USER DATA:", JSON.stringify(user))
-}, [user])
-
   const timeLeft = useCountdown()
   const [participantes, setParticipantes] = useState(0)
   const [yaParticipo, setYaParticipo] = useState(false)
@@ -88,11 +84,9 @@ export default function Home() {
     setCargando(true)
 
     try {
-      // 1. Obtener reference ID del servidor
       const refRes = await fetch("/api/initiate-payment", { method: "POST" })
       const { id: reference } = await refRes.json()
 
-      // 2. Lanzar el pago con MiniKit
       const payload: PayCommandInput = {
         reference,
         to: process.env.NEXT_PUBLIC_WALLET_ADDRESS as string,
@@ -107,15 +101,15 @@ export default function Home() {
 
       const { finalPayload } = await MiniKit.commandsAsync.pay(payload)
 
-      // 3. Confirmar el pago en el servidor
+      // Debug: ver qué contiene finalPayload
       const confirmRes = await fetch("/api/confirm-payment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-       body: JSON.stringify({
+        body: JSON.stringify({
           payload: finalPayload,
+          payload_debug: JSON.stringify(finalPayload),
           world_id: id,
           username: user?.username,
-          wallet_address: (MiniKit as any).walletAddress,
         }),
       })
 

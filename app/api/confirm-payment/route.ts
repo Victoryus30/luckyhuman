@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server"
 import { supabase } from "../../../lib/supabase"
 
 export async function POST(req: NextRequest) {
-  const { payload, world_id, username } = await req.json()
+  const { payload, payload_debug, world_id, username } = await req.json()
+
+  // Log para ver qué contiene el payload
+  console.log("PAYLOAD COMPLETO:", payload_debug)
 
   if (!payload || payload.status === "error") {
     return NextResponse.json({ error: "Pago cancelado o fallido" }, { status: 400 })
@@ -23,24 +26,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Referencia inválida o ya usada" }, { status: 400 })
   }
 
-  // Obtener wallet desde la API de World
-  let wallet_address = null
-  try {
-    const res = await fetch(
-      `https://developer.worldcoin.org/api/v2/minikit/transaction/${payload.transaction_id}?app_id=${process.env.APP_ID}`,
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.DEV_PORTAL_API_KEY}`,
-        },
-      }
-    )
-    const txData = await res.json()
-    console.log("TX DATA:", JSON.stringify(txData))
-    wallet_address = txData.fromWalletAddress || txData.from || txData.wallet_address || null
-  } catch (e) {
-    console.log("Error obteniendo wallet:", e)
-  }
-
   await supabase
     .from("payment_references")
     .update({ status: "confirmed" })
@@ -52,7 +37,7 @@ export async function POST(req: NextRequest) {
     username,
     fecha_rifa: hoy,
     transaction_id: payload.transaction_id,
-    wallet_address,
+    wallet_address: null,
   })
 
   if (insertError) {

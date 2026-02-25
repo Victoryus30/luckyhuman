@@ -26,6 +26,13 @@ function useCountdown() {
   return timeLeft
 }
 
+type Ganador = {
+  fecha_rifa: string
+  username: string
+  participantes: number
+  pool_ganador: number
+}
+
 export default function Home() {
   const { user, isConnected, signIn } = useWorldAuth({
     onWrongEnvironment() {
@@ -37,9 +44,11 @@ export default function Home() {
   const [participantes, setParticipantes] = useState(0)
   const [yaParticipo, setYaParticipo] = useState(false)
   const [cargando, setCargando] = useState(false)
+  const [ganadores, setGanadores] = useState<Ganador[]>([])
 
   useEffect(() => {
     cargarParticipantes()
+    cargarGanadores()
   }, [])
 
   useEffect(() => {
@@ -56,6 +65,15 @@ export default function Home() {
       .select("*", { count: "exact", head: true })
       .eq("fecha_rifa", hoy)
     setParticipantes(count || 0)
+  }
+
+  async function cargarGanadores() {
+    const { data } = await supabase
+      .from("ganadores")
+      .select("fecha_rifa, username, participantes, pool_ganador")
+      .order("fecha_rifa", { ascending: false })
+      .limit(5)
+    if (data) setGanadores(data)
   }
 
   async function verificarParticipacion(worldId: string) {
@@ -101,13 +119,11 @@ export default function Home() {
 
       const { finalPayload } = await MiniKit.commandsAsync.pay(payload)
 
-      // Debug: ver qué contiene finalPayload
       const confirmRes = await fetch("/api/confirm-payment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           payload: finalPayload,
-          payload_debug: JSON.stringify(finalPayload),
           world_id: id,
           username: user?.username,
         }),
@@ -171,6 +187,25 @@ export default function Home() {
           </Button>
         )}
       </div>
+
+      {ganadores.length > 0 && (
+        <div className="w-full max-w-sm mt-10">
+          <h2 className="text-gray-400 text-sm font-semibold mb-3 text-center uppercase tracking-widest">
+            Últimos ganadores
+          </h2>
+          <div className="flex flex-col gap-3">
+            {ganadores.map((g) => (
+              <div key={g.fecha_rifa} className="bg-gray-900 rounded-2xl p-4 flex items-center justify-between">
+                <div>
+                  <p className="font-bold text-white">@{g.username}</p>
+                  <p className="text-gray-500 text-xs">{g.fecha_rifa} · {g.participantes} participantes</p>
+                </div>
+                <p className="text-green-400 font-bold text-sm">{g.pool_ganador.toFixed(2)} WLD</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <p className="text-gray-600 text-xs mt-8 text-center max-w-xs">
         Solo 1 entrada por persona verificada. Sin bots. Sin trampa.
